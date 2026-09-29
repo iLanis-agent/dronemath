@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DroneMath - calculator</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #10141f; color: #e8edf7; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+  main { max-width: 720px; padding: 32px 20px 48px; width: 100%; box-sizing: border-box; }
+  h1 { font-size: 1.9rem; margin: 0 0 4px; }
+  p.sub { color: #a3b2cc; margin: 0 0 20px; }
+  .card { background: #171d2d; border: 1px solid #29334e; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
+  label { display: block; color: #96a5c2; font-size: 0.82rem; margin-bottom: 4px; }
+  input, select { width: 100%; box-sizing: border-box; background: #10141f; border: 1px solid #333f5e; color: #e8edf7; border-radius: 8px; padding: 9px 10px; font-size: 0.95rem; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .presets button { background: #1e2740; color: #cfdaf0; border: 1px solid #333f5e; border-radius: 999px; padding: 7px 14px; font-size: 0.85rem; cursor: pointer; }
+  .presets button:hover { background: #293556; }
+  .out { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .metric { background: #10141f; border: 1px solid #29334e; border-radius: 10px; padding: 12px 14px; }
+  .metric .v { font-size: 1.3rem; font-weight: 700; color: #83a6ea; }
+  .metric .k { color: #96a5c2; font-size: 0.78rem; margin-top: 2px; }
+  .note { color: #8494b0; font-size: 0.82rem; line-height: 1.5; margin-top: 10px; }
+  a.back { color: #83a6ea; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>&#128752;&#65038; DroneMath</h1>
+  <p class="sub">Drone flight calculator. The box says 34 minutes; here is what you get.</p>
+  <div class="presets">
+    <button data-p="newcalm">New pack, calm day</button>
+    <button data-p="breezy">Breezy afternoon</button>
+    <button data-p="oldpack">Aged pack, wind</button>
+    <button data-p="mapping">Mapping mission</button>
+  </div>
+  <div class="card">
+    <div class="grid">
+      <div><label>Advertised flight time (min)</label><input id="advertisedMin" type="number" value="34" min="5"></div>
+      <div><label>Cruise speed (mph)</label><input id="speedMph" type="number" value="30" min="5"></div>
+      <div><label>Top speed (mph)</label><input id="topSpeedMph" type="number" value="42" min="10"></div>
+      <div><label>Wind today (mph)</label><input id="windMph" type="number" value="8" min="0"></div>
+      <div><label>Battery cycles so far</label><input id="batteryCycles" type="number" value="20" min="0"></div>
+      <div><label>Battery capacity (Wh)</label><input id="batteryWh" type="number" value="77" min="10"></div>
+      <div><label>Pack price ($)</label><input id="packPrice" type="number" value="159" min="20"></div>
+      <div><label>Rated cycles</label><input id="ratedCycles" type="number" value="200" min="50"></div>
+      <div><label>Charger watts</label><input id="chargerW" type="number" value="65" min="10"></div>
+      <div><label>Mapping area (acres)</label><input id="areaAcres" type="number" value="40" min="1"></div>
+      <div><label>Mission altitude (m)</label><input id="altM" type="number" value="100" min="20"></div>
+      <div><label>Overlap</label><select id="overlap"><option value="0.7">70%</option><option value="0.75" selected>75%</option><option value="0.8">80%</option></select></div>
+    </div>
+  </div>
+  <div class="out">
+    <div class="metric"><div class="v" id="o-flight">-</div><div class="k">Real flight time (min)</div></div>
+    <div class="metric"><div class="v" id="o-range">-</div><div class="k">One-way range (miles)</div></div>
+    <div class="metric"><div class="v" id="o-wind">-</div><div class="k">Wind verdict</div></div>
+    <div class="metric"><div class="v" id="o-charge">-</div><div class="k">Charge time (hrs)</div></div>
+    <div class="metric"><div class="v" id="o-cost">-</div><div class="k">Battery cost per flight hour</div></div>
+    <div class="metric"><div class="v" id="o-gsd">-</div><div class="k">Mapping GSD (cm/px)</div></div>
+    <div class="metric"><div class="v" id="o-photos">-</div><div class="k">Photos for the area</div></div>
+    <div class="metric"><div class="v" id="o-alt">-</div><div class="k">Legal altitude cap (m)</div></div>
+  </div>
+  <p class="note" id="o-detail"></p>
+  <p class="note">Numbers are planning estimates for calm judgment, not flight control. Wind aloft is stronger than wind at the launch pad; the 2/3 rule already assumes you noticed.</p>
+  <p><a class="back" href="index.html">&larr; Back to DroneMath</a></p>
+</main>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var ids = ['advertisedMin','speedMph','topSpeedMph','windMph','batteryCycles','batteryWh','packPrice','ratedCycles','chargerW','areaAcres','altM','overlap'];
+  function num(id) { var v = parseFloat(document.getElementById(id).value); return isFinite(v) ? v : 0; }
+  function compute() {
+    if (typeof DroneMath === 'undefined') return;
+    var o = {
+      advertisedMin: num('advertisedMin'), windMph: num('windMph'), batteryCycles: num('batteryCycles'),
+      speedMph: num('speedMph'), packPrice: num('packPrice'), ratedCycles: num('ratedCycles')
+    };
+    var t = DroneMath.flightMinutes(o);
+    var range = DroneMath.rangeMiles(o);
+    var windv = DroneMath.windVerdict(num('windMph'), num('topSpeedMph'));
+    var charge = DroneMath.chargeHours(num('batteryWh'), num('chargerW'));
+    var cost = DroneMath.costPerFlightHour(o);
+    var gsd = DroneMath.gsdCm({altM: num('altM'), sensorMm: 13.2, focalMm: 8.8, imgPx: 5280});
+    var photos = DroneMath.mappingPhotos({areaAcres: num('areaAcres'), altM: num('altM'), sensorMm: 13.2, focalMm: 8.8, overlap: num('overlap')});
+    var alt = DroneMath.legalAltM(num('altM'));
+    document.getElementById('o-flight').textContent = t + ' min';
+    document.getElementById('o-range').textContent = range + ' mi';
+    document.getElementById('o-wind').textContent = DroneMath.windLimitMph(num('topSpeedMph')) + ' mph max';
+    document.getElementById('o-charge').textContent = charge + ' h';
+    document.getElementById('o-cost').textContent = '$' + cost.toFixed(2);
+    document.getElementById('o-gsd').textContent = gsd + ' cm/px';
+    document.getElementById('o-photos').textContent = isFinite(photos) ? photos : 'n/a';
+    document.getElementById('o-alt').textContent = alt + ' m';
+    document.getElementById('o-detail').textContent =
+      'Wind: ' + windv + '. At ' + t + ' real minutes the pack burns ' +
+      DroneMath.whPerMin(num('batteryWh'), t) + ' Wh/min.' +
+      (num('altM') > alt ? ' Your requested altitude exceeds the 400 ft cap - plan at ' + alt + ' m.' : '');
+  }
+  var presets = {
+    newcalm: {advertisedMin:34, speedMph:30, topSpeedMph:42, windMph:3, batteryCycles:5, batteryWh:77, packPrice:159, ratedCycles:200, chargerW:65, areaAcres:40, altM:100, overlap:0.75},
+    breezy: {advertisedMin:34, speedMph:30, topSpeedMph:42, windMph:18, batteryCycles:40, batteryWh:77, packPrice:159, ratedCycles:200, chargerW:65, areaAcres:40, altM:100, overlap:0.75},
+    oldpack: {advertisedMin:34, speedMph:30, topSpeedMph:42, windMph:15, batteryCycles:180, batteryWh:77, packPrice:159, ratedCycles:200, chargerW:65, areaAcres:40, altM:100, overlap:0.75},
+    mapping: {advertisedMin:34, speedMph:25, topSpeedMph:42, windMph:6, batteryCycles:30, batteryWh:77, packPrice:159, ratedCycles:200, chargerW:65, areaAcres:120, altM:120, overlap:0.8}
+  };
+  Array.prototype.forEach.call(document.querySelectorAll('.presets button'), function (b) {
+    b.addEventListener('click', function () {
+      var p = presets[b.getAttribute('data-p')];
+      if (!p) return;
+      Object.keys(p).forEach(function (k) { document.getElementById(k).value = p[k]; });
+      compute();
+    });
+  });
+  ids.forEach(function (id) {
+    document.getElementById(id).addEventListener('input', compute);
+    document.getElementById(id).addEventListener('change', compute);
+  });
+  compute();
+})();
+</script>
+</body>
+</html>
